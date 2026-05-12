@@ -1,0 +1,74 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+.DS_Store
+dist
+dist-ssr
+coverage
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+*.tsbuildinfo
+
+.eslintcache
+
+# Cypress
+/cypress/videos/
+/cypress/screenshots/
+
+# Vitest
+__screenshots__/
+
+# IDE / AI tools
+.kilo/
+.trae/
+.VSCodeCounter/
+.roomodes
+
+# Backend / data processing
+flask/
+dealdata/
+gpt/
+UItest/
+毕业设计/
+
+# Root-level data processing files
+*.py
+cleanup.js
+extract_*.js
+generate_*.js
+merge_*.py
+validate_*.py
+verify_*.py
+fix_*.py
+format_*.py
+
+# Unnecessary public assets
+public/backup_src/
+public/doc/
+public/data/杂/
+
+# Root-level data / temp files
+dilithium_real_data.json
+null
+gpt.txt
+temp_output.txt
+PQC_Vue_Tutorial.md
+优化建议.md
+已完成内容与建议内容对比.md

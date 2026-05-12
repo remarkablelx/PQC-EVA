@@ -1,0 +1,232 @@
+{
+  "concepts": {
+    "merkle_tree": {
+      "name": "Merkle Tree (哈希树)",
+      "definition": "二叉树结构，Root = Hash(Left || Right)",
+      "explanation": "二叉树结构，用于将所有 \\(2^h\\) 个 WOTS+ 密钥对的公钥（叶子）聚合为一个单一的主公钥（根节点 Root）。这种结构允许仅通过根节点验证树中任意叶子的完整性。"
+    },
+    "wots_plus": {
+      "name": "WOTS+ (Winternitz One-Time Signature+)",
+      "definition": "基于哈希链的一次性签名方案",
+      "explanation": "XMSS 的“原子”签名单元，位于 Merkle 树的底部。它基于哈希链原理，每一对密钥只能安全地使用一次。它通过哈希链（Hash Chain）工作。私钥是链的起点，公钥是链的终点。"
+    },
+    "stateful": {
+      "name": "Stateful (有状态)",
+      "definition": "必须维护状态索引 idx",
+      "explanation": "XMSS 必须维护一个签名计数器（索引 idx），记录哪些一次性密钥已经被使用过。如果状态管理失败（如回滚、重用索引），安全性将彻底崩溃。"
+    },
+    "l_tree": {
+      "name": "L-Tree",
+      "definition": "用于压缩数据的哈希结构",
+      "explanation": "WOTS+ 的公钥体积很大（包含多个哈希值），L-Tree 将其压缩为一个单一的 \\(n\\) 字节哈希值，以便挂载到 Merkle 树上作为叶子节点。"
+    },
+    "auth_path": {
+      "name": "AuthPath (认证路径)",
+      "definition": "从叶子到根的路径上的兄弟节点集合",
+      "explanation": "为了让验证者能从叶子节点计算出根节点，签名中包含的辅助节点集合。它包含了从叶子到根的路径上所有的“兄弟节点”。"
+    }
+  },
+  "steps": {
+    "keygen": [
+      {
+        "id": "step1",
+        "name": "生成种子",
+        "desc": "生成两个随机种子：\\(SK_{seed}\\)（用于派生所有底层的 WOTS+ 私钥）和 \\(PK_{seed}\\)（用于哈希函数的随机化参数，防止多目标攻击）。",
+        "formula": "SK_{seed}, PK_{seed} \\leftarrow \\{0,1\\}^n",
+        "explanation": "XMSS 采用了极致的存储优化策略，不直接存储成千上万个底层 WOTS+ 私钥，而是利用伪随机函数 (PRF) 和种子 SKseed 配合索引动态生成它们，使得私钥极其紧凑。同时，引入 PKseed (PUB_SEED) 作为哈希函数的“盐”或“域分离符”贯穿整个算法，其核心作用是确保针对这棵树的所有哈希计算都是独一无二的，有效防止攻击者通过预计算哈希碰撞实施多目标攻击。",
+        "common": "SKseed 就像是一台“万能印钞机的模版”，只要拥有它，就能随时印出任意一张指定编号的钞票（底层私钥），从而省去了随身背负一卡车钞票的麻烦。而 PKseed 则像是给这次行动设定的“特殊口令”，所有的接头暗号（哈希计算）都必须加上这个口令才生效，防止别人拿以前任务的旧暗号来混淆视听。",
+        "algorithm_detail": "使用密码学安全的随机数生成器生成 \\(n\\) 字节的种子。通常 \\(n=32\\) (SHA2-256) 或 \\(n=64\\) (SHA2-512)。",
+        "security_note": "种子的熵必须足够高。如果种子可预测，所有的私钥都将泄露。",
+        "dataType": "secret",
+        "owner": "Alice",
+        "phase": "KeyGen"
+      },
+      {
+        "id": "step2",
+        "name": "生成叶子节点 (WOTS+ 公钥)",
+        "desc": "利用 \\(SK_{seed}\\) 和索引 \\(i\\) 生成第 \\(i\\) 个 WOTS+ 私钥。对私钥进行哈希链运算，计算出 WOTS+ 公钥。L-Tree 压缩：将 WOTS+ 公钥通过 L-Tree 哈希压缩，得到第 \\(i\\) 个叶子节点 \\(Leaf_i\\)。",
+        "formula": "Leaf_i = \\text{LTree}(\\text{WOTS\\_PK}_i)",
+        "explanation": "对于树底部的每一个位置 \\(i\\)，系统首先使用 SKseed 派生出对应的 WOTS+ 私钥，随后通过哈希链函数 (Chain Function) 计算出 WOTS+ 公钥，这是 XMSS 的安全基石。由于生成的 WOTS+ 公钥由多个哈希值组成（例如 67 个 32 字节哈希），体积过大不适合直接作为 Merkle 树的叶子，因此需要使用 L-Tree 结构对其进行哈希压缩，将其“折叠”成一个单一的 32 字节哈希值 \\(Leaf_i\\)。<br><br><strong>核心概念解析：</strong><ul class=\"list-disc pl-5 mt-2\"><li><strong>L-Tree</strong>：一种用于数据压缩的哈希结构。WOTS+ 的公钥体积很大，L-Tree 将其压缩为一个单一的 \\(n\\) 字节哈希值，以便挂载到 Merkle 树上作为叶子节点。</li></ul>",
+        "common": "树的每一片叶子实际上原本是一个巨大的“一次性印章盒”（WOTS+）。因为盒子太大太重，挂在树枝上不稳当，所以我们用一种压缩机器（L-Tree）把它压扁，变成了一个精巧的小挂件（Leaf），这样就能轻松地挂在树枝末端了。",
+        "algorithm_detail": "WOTS+ 参数 \\(w\\) 通常取 16。哈希链长度为 \\(w-1\\)。L-Tree 也是一种树形哈希结构，用于将 WOTS+ 公钥的多个组件压缩为单个根值。",
+        "security_note": "L-Tree 的压缩性质依赖于哈希函数的抗第二原像性。",
+        "dataType": "calculation",
+        "owner": "Alice",
+        "phase": "KeyGen"
+      },
+      {
+        "id": "step3",
+        "name": "构建树与计算根节点",
+        "desc": "将相邻的叶子节点两两哈希合并（\\(Hash(Left || Right)\\)），生成父节点。层层向上，直到计算出唯一的根节点 \\(Root\\)。",
+        "formula": "Root = \\text{MerkleHash}(\\{Leaf_i\\})",
+        "explanation": "这是标准的 Merkle 树构建过程，遵循自底向上的递归逻辑。相邻的两个节点 (Left, Right) 进行哈希运算 \\(Hash(Left || Right)\\) 生成父节点，这一过程不断重复，层层向上汇聚，最终形成唯一的根节点 Root。这个根节点在数学上以密码学强度“承诺”了整棵树下所有叶子节点的完整性与不可篡改性。<br><br><strong>核心概念解析：</strong><ul class=\"list-disc pl-5 mt-2\"><li><strong>Merkle Tree (哈希树)</strong>：二叉树结构，用于将所有 \\(2^h\\) 个 WOTS+ 密钥对的公钥（叶子）聚合为一个单一的主公钥（根节点 Root）。</li></ul>",
+        "common": "这就像是一场残酷的淘汰赛。最底层是所有参赛选手（叶子），他们两两一组进行 PK（哈希合并），胜者晋级下一轮。经过层层选拔，最后产生的那个“总冠军”就是根节点（Root）。只要总冠军的名字确定了，整个晋级图表也就被彻底锁定了，谁也改不了。",
+        "algorithm_detail": "使用特殊的哈希地址结构来防止不同层级间的哈希值混淆。树高 \\(h\\) 决定了签名容量。",
+        "security_note": "根节点是验证签名的唯一信任锚点。必须确保根节点的完整性。",
+        "dataType": "calculation",
+        "owner": "Alice",
+        "phase": "KeyGen"
+      },
+      {
+        "id": "step4",
+        "name": "输出密钥",
+        "desc": "公钥 (\\(PK\\))：包含 \\(Root\\) 和 \\(PK_{seed}\\)。私钥 (\\(SK\\))：包含 \\(SK_{seed}\\), \\(PK_{seed}\\), \\(idx\\)（当前可用签名的索引，初始为 0）。",
+        "formula": "PK = (Root, PK_{seed}), SK = (SK_{seed}, idx, ...)",
+        "explanation": "最终输出的公钥包含 \\([Root || PUB\\_SEED]\\)，这是验证者验证签名所需的全部公开信息。而私钥则包含了种子以及至关重要的状态索引 idx（初始为 0），这个索引指示了下一张可用的“一次性支票”在树中的确切位置。",
+        "common": "公钥就是“总冠军的名字”和“比赛专用口令”，大家都能看。私钥则是“印钞机模版”和一个“计数器”，这个计数器时刻记录着哪张支票还没被撕下来用过，是私钥主人的记账本。",
+        "algorithm_detail": "公钥非常小（通常几十字节）。私钥也很小，但需要持久化存储来维护 \\(idx\\)。",
+        "security_note": "\\(idx\\) 是私钥中最敏感的状态部分，必须严格单调递增。",
+        "dataType": "secret",
+        "owner": "Alice",
+        "phase": "KeyGen"
+      }
+    ],
+    "sign": [
+      {
+        "id": "step5",
+        "name": "状态检查",
+        "desc": "读取私钥中的 \\(idx\\)。如果 \\(idx \\ge 2^h\\)，说明签名次数已用尽，必须停止并报错。",
+        "formula": "idx < 2^h ?",
+        "explanation": "XMSS 树的高度 \\(h\\) 决定了其总容量为 \\(2^h\\)。由于底层的 WOTS+ 安全性严格依赖于一次性假设，算法必须检查当前 idx 是否超出范围。如果 idx 溢出或者同一个 idx 被复用，攻击者就能利用 WOTS+ 的数学特性伪造签名，因此状态检查是防线的起点。<br><br><strong>核心概念解析：</strong><ul class=\"list-disc pl-5 mt-2\"><li><strong>Stateful (有状态)</strong>：XMSS 必须维护一个签名计数器（索引 idx），记录哪些一次性密钥已经被使用过。如果状态管理失败（如回滚、重用索引），安全性将彻底崩溃。</li></ul>",
+        "common": "这一步就是检查支票本是不是已经用完了。如果最后一张支票都撕掉了还要硬签，不仅签不出来，还可能因为重复使用旧支票根而彻底暴露账户密码，导致倾家荡产。",
+        "algorithm_detail": "这是一个简单的比较操作，但对安全性至关重要。",
+        "security_note": "如果签名次数耗尽，私钥必须失效，不能再进行任何签名。",
+        "dataType": "check",
+        "owner": "Alice",
+        "phase": "Sign"
+      },
+      {
+        "id": "step6",
+        "name": "消息摘要",
+        "desc": "生成一个随机数 \\(r\\)（用于随机化哈希）。将消息 \\(M\\) 哈希为摘要 \\(M'\\)。",
+        "formula": "M' = H_{msg}(r, Root, idx, M)",
+        "explanation": "算法利用伪随机函数生成随机数 \\(R\\)，并计算 \\(M' = H_{msg}(R, Root, M)\\)。这一步不仅将任意长度的消息压缩为固定长度的摘要，更重要的是引入了随机性 \\(R\\)，确保每次签名的哈希输入都是独特的，这种随机化哈希（Randomized Hashing）极大地增强了算法在随机预言机模型下的安全性证明。",
+        "common": "给要签名的文件“加点盐”（随机数 \\(R\\)），然后放入粉碎机磨成粉（摘要）。这样做的好处是，即使你连续签两份一模一样的文件，因为加的盐不同，出来的粉末样子也完全不同，让想找规律的坏人无从下手。",
+        "algorithm_detail": "这一步将消息 \\(M\\) 映射到哈希链的索引空间。随机数 \\(r\\) 通常包含在最终签名中。",
+        "security_note": "随机化哈希使得即使哈希函数存在碰撞缺陷，攻击者也难以利用。",
+        "dataType": "hash",
+        "owner": "Alice",
+        "phase": "Sign"
+      },
+      {
+        "id": "step7",
+        "name": "WOTS+ 签名",
+        "desc": "使用第 \\(idx\\) 个 WOTS+ 私钥对摘要 \\(M'\\) 进行签名。得到 \\(sig_{WOTS}\\)。",
+        "formula": "sig_{WOTS} = \\text{WOTS\\_Sign}(sk_{idx}, M')",
+        "explanation": "利用当前 idx 对应的 WOTS+ 私钥对摘要 \\(M'\\) 进行签名。WOTS+ 基于哈希链原理，私钥位于链的起点，如果摘要数值是 \\(x\\)，签名者就从起点往后计算 \\(x\\) 次哈希并将结果发布。由于哈希函数的单向性，攻击者无法从发布的中间值反推出起点（私钥），从而保证了签名的不可伪造性。<br><br><strong>核心概念解析：</strong><ul class=\"list-disc pl-5 mt-2\"><li><strong>WOTS+ (Winternitz One-Time Signature+)</strong>：XMSS 的“原子”签名单元。基于哈希链原理，私钥是链的起点，公钥是链的终点。</li></ul>",
+        "common": "这叫“步数证明”。我有几条秘密通道，每条通道长 \\(w\\) 步。如果消息是数字“5”，我就在秘密通道里走 5 步，并在那个位置插个旗。验证者看到旗子，就知道我确实是从起点出发的，但我绝不会告诉你起点（私钥）究竟在什么位置。",
+        "algorithm_detail": "WOTS+ 签名由多个哈希链值组成。它消耗了一次性的私钥。",
+        "security_note": "同一个 WOTS+ 私钥绝对不能对两个不同的消息摘要签名，否则会泄露私钥。",
+        "dataType": "calculation",
+        "owner": "Alice",
+        "phase": "Sign"
+      },
+      {
+        "id": "step8",
+        "name": "计算认证路径 (AuthPath)",
+        "desc": "AuthPath 包含从叶子到根的路径上，所有兄弟节点的哈希值。",
+        "formula": "AuthPath = \\text{GetAuthPath}(idx)",
+        "explanation": "验证者通常只知道根节点，而不知道整棵树的具体结构。为了证明第 idx 个叶子确实属于这棵树，签名者必须提供从该叶子通往根节点路径上所需的所有兄弟节点 (Sibling Nodes)。这些节点是验证者在每一步哈希计算中缺失的“另一半”输入。<br><br><strong>核心概念解析：</strong><ul class=\"list-disc pl-5 mt-2\"><li><strong>AuthPath (认证路径)</strong>：为了让验证者能从叶子节点计算出根节点，签名中包含的辅助节点集合。它包含了从叶子到根的路径上所有的“兄弟节点”。</li></ul>",
+        "common": "这就像是提供一份“寻路指南”。验证者想从树底爬到树顶，但他是个路痴。你必须告诉他：“在第一个岔路口往左拐（因为右边有兄弟节点 A 挡着），第二个岔路口往右拐（因为左边有兄弟节点 B）...”。这些作为路标的兄弟节点，就是认证路径。",
+        "algorithm_detail": "认证路径长度为 \\(h\\)。计算路径需要访问树的节点，为了效率通常使用 BDS 算法等树遍历算法。",
+        "security_note": "认证路径确保了签名可以链接到唯一的根节点。",
+        "dataType": "calculation",
+        "owner": "Alice",
+        "phase": "Sign"
+      },
+      {
+        "id": "step9",
+        "name": "状态更新 (关键步骤)",
+        "desc": "将私钥中的索引加一：\\(idx \\leftarrow idx + 1\\)。必须在输出签名之前将新状态写入非易失性存储。",
+        "formula": "idx \\leftarrow idx + 1",
+        "explanation": "执行 idx ← idx + 1 并强制写入非易失性存储。这是 XMSS 安全性的物理保障，必须在输出签名之前完成。如果发生断电或程序崩溃导致状态回滚，就会引发“密钥重用”灾难，彻底破坏 WOTS+ 的一次性安全假设，因此这一步的操作顺序和持久化至关重要。<br><br><strong>核心概念解析：</strong><ul class=\"list-disc pl-5 mt-2\"><li><strong>Stateful (有状态)</strong>：XMSS 必须维护一个签名计数器（索引 idx）。如果状态管理失败（如回滚、重用索引），安全性将彻底崩溃。</li></ul>",
+        "common": "撕票：在把签好的支票递给别人之前，必须先把自己存根里的这张票狠狠撕掉（计数器加一），并记录在案。绝对不能让同一张票号被撕下来两次，这是死规矩。",
+        "algorithm_detail": "在实现中，这通常对应于文件写操作或数据库事务。必须确保是“先更新，后签名”或“预留”模式。",
+        "security_note": "这是 XMSS 最大的安全风险点。在虚拟机快照恢复或备份还原场景下极易出错。",
+        "dataType": "secret",
+        "owner": "Alice",
+        "phase": "Sign"
+      },
+      {
+        "id": "step10",
+        "name": "输出签名",
+        "desc": "输出签名：\\(\\Sigma = (idx, r, sig_{WOTS}, AuthPath)\\)。",
+        "formula": "\\Sigma = (idx, r, sig_{WOTS}, AuthPath)\\",
+        "explanation": "最终输出的签名数据包 \\(\\Sigma = [idx || R || WOTS\\_SIG || AuthPath]\\)，其中包含了验证者重建根节点并验证签名合法性所需的所有组件。",
+        "common": "Alice 将打包好的签名发送给 Bob。",
+        "algorithm_detail": "签名大小固定，约为 \\(h \\cdot n + \\text{len}(WOTS)\\)。",
+        "security_note": "签名包含了重建根节点所需的一切信息。",
+        "dataType": "signature",
+        "owner": "Alice",
+        "phase": "Sign"
+      }
+    ],
+    "verify": [
+      {
+        "id": "step11",
+        "name": "解析签名",
+        "desc": "从签名中提取 \\(idx\\), \\(r\\), \\(sig_{WOTS}\\), \\(AuthPath\\)。",
+        "formula": "\\Sigma \\to (idx, r, sig_{WOTS}, AuthPath)",
+        "explanation": "验证者从接收到的字节流中还原出各个部分：索引 idx 告知我们在树的哪个位置，随机数 \\(R\\) 用于复现消息摘要的计算，而签名主体和路径用于后续的数学验证。",
+        "common": "Bob 拆开签名包裹，清点里面的零件。",
+        "algorithm_detail": "按照标准格式反序列化。",
+        "security_note": "需要检查格式是否合规，防止畸形包攻击。",
+        "dataType": "check",
+        "owner": "Bob",
+        "phase": "Verify"
+      },
+      {
+        "id": "step12",
+        "name": "重建 WOTS+ 公钥",
+        "desc": "利用 \\(sig_{WOTS}\\) 和消息摘要 \\(M'\\)，验证者执行剩余的哈希链运算，推算出临时的 WOTS+ 公钥。",
+        "formula": "PK'_{WOTS} = \\text{Chain}(sig, w-1-M')",
+        "explanation": "验证者执行 WOTS+ 签名的逆过程，实际上是继续完成哈希链的剩余部分。如果签名者走了 \\(x\\) 步，验证者就接着走 \\(w-1-x\\) 步。基于哈希链的性质，如果签名是合法的，验证者最终到达的终点值应当等同于生成该叶子时所用的 WOTS+ 公钥值。<br><br><strong>核心概念解析：</strong><ul class=\"list-disc pl-5 mt-2\"><li><strong>WOTS+</strong>：基于哈希链原理，验证者通过继续哈希链的运算来恢复公钥。</li></ul>",
+        "common": "接力赛：签名者走了 5 步插了旗。验证者从旗子开始，接过接力棒接着走剩下的步数。如果最后验证者成功冲过了终点线（算出了 WOTS+ 公钥），那就说明刚才插旗的那个人，确实是按照规则从起点出发的队友。",
+        "algorithm_detail": "这一步计算量主要在于哈希链运算。WOTS+ 的校验和（Checksum）机制在此步也会被计算和验证。",
+        "security_note": "如果签名者提供的哈希值不在链上，验证者计算出的结果将是无意义的随机值。",
+        "dataType": "calculation",
+        "owner": "Bob",
+        "phase": "Verify"
+      },
+      {
+        "id": "step13",
+        "name": "L-Tree 压缩",
+        "desc": "将重建的 WOTS+ 公钥通过 L-Tree 算法压缩，得到第 \\(idx\\) 个叶子节点 \\(Leaf_{candidate}\\)。",
+        "formula": "Leaf_{cand} = \\text{LTree}(PK'_{WOTS})",
+        "explanation": "验证者利用 L-Tree 算法将step 12 中恢复出来的 WOTS+ 公钥（即巨大的印章盒）进行压缩，计算出候选叶子节点 \\(Leaf_{candidate}\\)。这一步的逻辑与密钥生成时的 step 2 完全一致。",
+        "common": "把验证者刚刚算出来的那个“印章盒”也用机器压扁，变成一个小挂件，准备挂到树上去进行下一步的比对。",
+        "algorithm_detail": "与 KeyGen 中使用的 L-Tree 算法完全相同。",
+        "security_note": "确保压缩过程的一致性。",
+        "dataType": "calculation",
+        "owner": "Bob",
+        "phase": "Verify"
+      },
+      {
+        "id": "step14",
+        "name": "路径计算 (Root Reconstruction)",
+        "desc": "利用 \\(idx\\)（决定左右位置）和 \\(AuthPath\\)（兄弟节点），从 \\(Leaf_{candidate}\\) 开始层层向上哈希，直到计算出树顶的候选根节点 \\(Root_{candidate}\\)。",
+        "formula": "Root_{cand} = \\text{MerklePath}(Leaf_{cand}, AuthPath, idx)",
+        "explanation": "利用索引 idx 的二进制位来判断每一步是作为左节点还是右节点（0 为左，1 为右），并结合签名中提供的 AuthPath（兄弟节点），不断进行哈希运算 \\(Hash(Node_{left} || Node_{right})\\)。这一过程沿着树层层向上，最终计算出一个候选根节点 \\(Root_{candidate}\\)。<br><br><strong>核心概念解析：</strong><ul class=\"list-disc pl-5 mt-2\"><li><strong>AuthPath (认证路径)</strong>：验证者利用认证路径中的兄弟节点，配合计算出的叶子节点，重构出根节点。</li></ul>",
+        "common": "按图索骥：验证者拿着手里的小挂件（叶子），严格按照签名里附带的“寻路指南”（认证路径）一路向上合并攀登，最后在树顶算出了一个他认为的“总冠军”。",
+        "algorithm_detail": "路径计算需要 \\(h\\) 次哈希运算。索引 \\(idx\\) 的每一位决定了当前节点是作为左输入还是右输入。",
+        "security_note": "如果认证路径中的任何一个哈希值是错误的，计算出的根节点将完全不同。",
+        "dataType": "calculation",
+        "owner": "Bob",
+        "phase": "Verify"
+      },
+      {
+        "id": "step15",
+        "name": "最终验证",
+        "desc": "比较计算出的 \\(Root_{candidate}\\) 是否与公钥中的 \\(PK.Root\\) 完全一致。如果一致，签名有效；否则无效。",
+        "formula": "Root_{cand} == PK.Root",
+        "explanation": "将计算出的候选根节点 \\(Root_{candidate}\\) 与公钥中的 \\(PK.Root\\) 进行比对。如果两者严格相等，基于哈希函数的抗碰撞性，可以断定攻击者在不知道私钥的情况下不可能伪造出能生成相同根节点的签名，从而验证通过。",
+        "common": "验明正身：最后一步，看看验证者自己算出来的这个“总冠军”，是不是和公钥公告栏里贴的那个“总冠军”是同一个人。如果是，签名就是真的；如果不是，那就是有人伪造了签名。",
+        "algorithm_detail": "简单的字节比较。",
+        "security_note": "这是认证的终点。基于 Merkle 树的根节点唯一性。",
+        "dataType": "check",
+        "owner": "Bob",
+        "phase": "Verify"
+      }
+    ]
+  }
+}

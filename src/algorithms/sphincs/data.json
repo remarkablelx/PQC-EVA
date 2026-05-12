@@ -1,0 +1,162 @@
+{
+  "concepts": {
+    "hypertree": {
+      "name": "超树 (Hypertree)",
+      "definition": "由多层 Merkle 树堆叠而成的宏观结构",
+      "explanation": "宏观结构，由多层 Merkle 树（实际上是 XMSS 树）堆叠而成。结构：顶层树对下一层树的根节点进行签名，依此类推，直到最底层树对 FORS 的公钥进行签名。这种分层结构允许使用较小的子树来构建极大的虚拟地址空间。"
+    },
+    "fors": {
+      "name": "FORS (Forest of Random Subsets)",
+      "definition": "用于消息签名的少次签名方案",
+      "explanation": "作用：位于最底层，直接对消息摘要进行签名。特性：一种“少次”签名方案（Few-Time Signature）。它通过随机选择多个子集来分散风险，即使多次使用也不容易被攻破，但在 SPHINCS+ 中只对每个消息使用一次。"
+    },
+    "wots_plus": {
+      "name": "WOTS+ (Winternitz One-Time Signature+)",
+      "definition": "基于哈希链的一次性签名方案",
+      "explanation": "作用：作为超树中每一层 XMSS 树的叶子节点，用于签署下一层树的根（或最底层的 FORS 公钥）。特性：一次性签名，安全性极高，基于哈希链。"
+    },
+    "stateless": {
+      "name": "Stateless (无状态)",
+      "definition": "不需要维护状态索引 idx",
+      "explanation": "指签名者不需要记录“已经使用了哪些密钥”或“签了几次名”。它通过生成巨大的随机索引（地址空间），使得每次签名随机选择位置发生碰撞的概率极低，从而消除了维护状态的需求。"
+    }
+  },
+  "steps": {
+    "keygen": [
+      {
+        "id": "step1",
+        "name": "生成种子",
+        "desc": "生成两个随机种子：\\(SK.seed\\)（用于派生所有私钥）和 \\(PK.seed\\)（用于哈希函数随机化）。",
+        "formula": "SK.seed, PK.seed \\leftarrow \\{0,1\\}^n",
+        "explanation": "SPHINCS+ 采用了极致的压缩策略，所有的密钥数据本质上都是通过伪随机函数 (PRF) 从种子派生出来的。系统生成 \\(SK.seed\\) 用于确定性地派生所有的底层 WOTS+ 私钥和 FORS 私钥；同时生成 \\(PK.seed\\)（即 PUB_SEED）作为全局“盐值”参与哈希计算。这种设计确保了针对该特定公钥的所有哈希值都是唯一的，有效防止了跨实例的攻击。",
+        "common": "魔法种子：Alice 不会真的去费力造一片拥有亿万片叶子的森林，她只保留了一颗“魔法种子”(\\(SK.seed\\))。只要手里有这颗种子，她想让森林的哪个部分（私钥）长出来，那个部分就会瞬间长出来，用完即焚，无需存储。",
+        "algorithm_detail": "种子长度通常为 \\(n\\) 字节（如 32 字节）。所有的子私钥都通过 PRF(SK.seed, address) 生成。",
+        "security_note": "私钥的安全性完全依赖于 \\(SK.seed\\) 的随机性和 PRF 的安全性。",
+        "dataType": "secret",
+        "owner": "Alice",
+        "phase": "KeyGen"
+      },
+      {
+        "id": "step2",
+        "name": "计算顶层根节点",
+        "desc": "利用种子生成顶层 XMSS 树的 WOTS+ 密钥对。构建顶层树，计算出其根节点 \\(Root_{top}\\)。",
+        "formula": "Root_{top} = \\text{BuildTopTree}(SK.seed, PK.seed)",
+        "explanation": "公钥的生成速度极快，因为算法不需要构建整个庞大的结构，只构建最顶层的那一棵 Merkle 树。SPHINCS+ 的底层结构是分层的“超树 (Hypertree)”，公钥只需要计算出最顶层树的根节点 \\(Root_{top}\\) 作为全局信任锚点。私钥则存储了种子，允许在后续签名时按需重新计算树的任何部分。<br><br><strong>核心概念解析：</strong><ul class=\"list-disc pl-5 mt-2\"><li><strong>超树 (Hypertree)</strong>：SPHINCS+ 不是单一大树，而是由 \\(d\\) 层 XMSS 树堆叠而成。KeyGen 只需要计算最顶层那棵树的根。</li></ul>",
+        "common": "国王印章：Alice 对外发布公钥时，只公布“国王”（顶层 Root）的印章。虽然国王下面还有省长、市长、村长（下层树的根），但生成公钥时不需要把他们都找来，只需要确定国王是谁就行了。这比 XMSS 需要生成整棵树要快得多。",
+        "algorithm_detail": "顶层树的高度为 \\(h/d\\)。计算根节点需要 \\(2^{h/d}\\) 次叶子生成和哈希操作。",
+        "security_note": "根节点是验证签名的信任锚点。",
+        "dataType": "calculation",
+        "owner": "Alice",
+        "phase": "KeyGen"
+      },
+      {
+        "id": "step3",
+        "name": "输出密钥",
+        "desc": "公钥 (\\(PK\\))：\\(PK.seed\\) 和 \\(Root_{top}\\)。私钥 (\\(SK\\))：\\(SK.seed\\), \\(PK.seed\\), \\(PK\\)。",
+        "formula": "PK = (PK.seed, Root_{top})",
+        "explanation": "公钥包含全局种子和顶层根节点。私钥包含用于生成秘密值的种子。由于是无状态的，私钥不需要存储任何计数器。",
+        "common": "Alice 将“国王印章”和“公开规则”打包发布。",
+        "algorithm_detail": "公钥大小非常小，约为 \\(2n\\) 字节。私钥也很小，约为 \\(4n\\) 字节。",
+        "security_note": "私钥必须保密，否则攻击者可以伪造任意签名。",
+        "dataType": "secret",
+        "owner": "Alice",
+        "phase": "KeyGen"
+      }
+    ],
+    "sign": [
+      {
+        "id": "step4",
+        "name": "消息随机化与索引选择",
+        "desc": "生成一个随机数 \\(R\\)。计算消息摘要和索引：利用 \\(R\\)、\\(PK\\) 和消息 \\(M\\)，计算出两个值：消息摘要 (Digest) 和 随机索引 (Index)。",
+        "formula": "(idx, digest) = H_{msg}(R, PK, M)",
+        "explanation": "这是 SPHINCS+ 实现“无状态”设计的核心。算法通过随机数 \\(R\\) 和消息 \\(M\\) 计算出一个巨大的随机索引（通常由 64 位或更多位组成）。这个索引将整个巨大的虚拟树结构中的某一个具体位置（包含特定的层级、子树和叶子）分配给这次签名。由于总的叶子数量极多（例如 \\(2^{64}\\)），随机选择同一个位置两次的碰撞概率极低，从而消除了记录“上次使用了哪个密钥”的需求。<br><br><strong>核心概念解析：</strong><ul class=\"list-disc pl-5 mt-2\"><li><strong>Stateless (无状态)</strong>：通过巨大的地址空间（如 \\(2^{64}\\)）和随机选择，避免了密钥重用的风险，无需维护状态 idx。</li></ul>",
+        "common": "沙漠埋金：XMSS 像一本支票簿，必须按顺序一张张撕，撕乱了就麻烦了。SPHINCS+ 像是在撒哈拉沙漠里埋宝藏。每次要签名，我就随机选一粒沙子。因为沙漠太大（地址空间巨大），我几乎不可能两次选到同一粒沙子，所以我也懒得记我上次选了哪粒，永远不用担心重复。",
+        "algorithm_detail": "索引 \\(idx\\) 确定了在超树的哪一层、哪棵树、哪个叶子节点进行签名。随机数 \\(R\\) 包含在签名中。",
+        "security_note": "只要哈希函数输出足够均匀，碰撞概率可以忽略不计。这是无状态安全性的基础。",
+        "dataType": "hash",
+        "owner": "Alice",
+        "phase": "Sign"
+      },
+      {
+        "id": "step5",
+        "name": "FORS 签名 (最底层)",
+        "desc": "根据消息摘要，在 FORS 结构中选择 \\(k\\) 个秘密值。发布这些值及其认证路径作为 \\(SIG_{FORS}\\)。计算 FORS 的公钥 \\(PK_{FORS}\\)。",
+        "formula": "SIG_{FORS} = \\text{FORS\\_Sign}(digest, SK)",
+        "explanation": "FORS (Forest of Random Subsets) 是一种“少次签名”方案，专门用于直接对消息摘要进行签名。签名过程是根据消息摘要的指示，揭示 FORS 私钥集合中的一部分特定值。由此计算出的 \\(PK_{FORS}\\) 是一个临时生成的根节点，它将作为上一层 WOTS+ 签名的“输入消息”，从而启动链式认证。<br><br><strong>核心概念解析：</strong><ul class=\"list-disc pl-5 mt-2\"><li><strong>FORS</strong>：用于直接签署消息的组件。虽然 FORS 密钥重用会降低安全性，但由于索引是随机选择的，针对同一组 FORS 密钥的重用概率极低。</li></ul>",
+        "common": "基层办事：FORS 就像是具体的“基层办事员”。他直接处理具体的文件（消息）。他盖了一个章（FORS 签名），并给出了他的工牌号（FORS 公钥），证明这具体的一件事是他经办的。",
+        "algorithm_detail": "FORS 签名包含 \\(k\\) 个私钥值和 \\(k\\) 条认证路径。验证者可以通过这些值重建 \\(PK_{FORS}\\)。",
+        "security_note": "FORS 是 SPHINCS+ 防止子集和攻击（Subset Sum Attack）的关键防线。",
+        "dataType": "calculation",
+        "owner": "Alice",
+        "phase": "Sign"
+      },
+      {
+        "id": "step6",
+        "name": "超树路径签名",
+        "desc": "每一层树使用 WOTS+ 对上一层树的根节点进行签名。从第 0 层到顶层，递归生成签名和认证路径。",
+        "formula": "SIG_{HT} = \\{\\text{Sign}_{Layer_i}(Root_{i-1})\\}",
+        "explanation": "这是建立层级信任的过程，构建从底层到顶层的认证路径。首先，第 0 层的 WOTS+ 密钥对 FORS 的公钥 \\(PK_{FORS}\\) 进行签名，并将该 WOTS+ 公钥压缩为 Merkle 树叶子，计算出该层树根 \\(Root_0\\)。接着，每一层的树根 \\(Root_i\\) 都被视为下一层树要签名的“消息”。上一层的 WOTS+ 密钥对 \\(Root_i\\) 签名，并提供 Merkle 路径证明该 WOTS+ 密钥确实位于上一层树中。这个过程递归向上，直到最顶层的树。",
+        "common": "层层审批：这是一条严密的官僚认证链。办事员 (FORS) 处理了文件。村长 (Level 0) 用签名证明：“这个办事员是我们村的”。市长 (Level 1) 用签名证明：“这个村长是我们市的”。...直到国王 (Top Level)。每一层都提供了一条“晋升路径”，证明下级确实隶属于上级。",
+        "algorithm_detail": "共 \\(d\\) 层。每层包含一个 WOTS+ 签名和一个 Merkle 认证路径。这部分构成了签名大小的主要部分。",
+        "security_note": "每一层的连接保证了信任链的传递。",
+        "dataType": "calculation",
+        "owner": "Alice",
+        "phase": "Sign"
+      },
+      {
+        "id": "step7",
+        "name": "组装签名",
+        "desc": "最终签名 \\(\\Sigma = (R, SIG_{FORS}, SIG_{HT})\\)。",
+        "formula": "\\Sigma",
+        "explanation": "最终的签名包 Σ 汇集了所有环节的证据：随机数 \\(R\\)（用于复现索引选择）、FORS 签名（对消息的直接证明）、以及每一层的 WOTS+ 签名和对应的 Merkle 认证路径（层级关系的证明）。",
+        "common": "汇总档案：所有的证明材料——办事员的章、村长的证明信、市长的推荐语——都被装进一个大信封（\\(\\Sigma\\)）里。验证者只要拿到这个信封，就能顺藤摸瓜查到底。",
+        "algorithm_detail": "SPHINCS+ 签名较大（KB 到几十 KB 级别），主要是因为包含了完整的认证路径和 FORS 签名。",
+        "security_note": "签名包含了验证所需的全部信息，验证者无需保存任何状态。",
+        "dataType": "signature",
+        "owner": "Alice",
+        "phase": "Sign"
+      }
+    ],
+    "verify": [
+      {
+        "id": "step8",
+        "name": "解析与重建 FORS 公钥",
+        "desc": "提取 \\(R\\), \\(SIG_{FORS}\\), 以及各层的 \\(SIG_{HT}\\)。利用消息 \\(M\\) 和 \\(SIG_{FORS}\\)，重新计算出底层的 FORS 公钥 \\(PK_{FORS}\\)。",
+        "formula": "PK_{FORS}' = \\text{Reconstruct}(M, SIG_{FORS})",
+        "explanation": "验证者首先使用签名中的 \\(R\\) 和收到的消息 \\(M\\) 计算哈希，确定 FORS 应该揭示哪些值。随后，利用签名包中提供的 \\(SIG_{FORS}\\)，验证者重新计算（恢复）出底层的 FORS 公钥 \\(PK_{FORS}\\)。",
+        "common": "核查办事员：验证者先看最底层的办事员。根据文件内容和办事员提供的证据，推算出“如果这事真是他办的，他的工牌号应该是 X”。",
+        "algorithm_detail": "解析签名，分离出 \\(R\\)、FORS 签名部分和 Hypertree 签名部分。",
+        "security_note": "必须验证格式正确性。",
+        "dataType": "check",
+        "owner": "Bob",
+        "phase": "Verify"
+      },
+      {
+        "id": "step9",
+        "name": "层层向上验证",
+        "desc": "使用 \\(SIG_{HT}\\) 和上一层计算出的 \\(Root_{i-1}\\)，计算出当前层的根 \\(Root_i\\)。一直重复直到计算出顶层树的根 \\(Root_{top}'\\)。",
+        "formula": "Root_{top}' = \\text{HypertreeVerify}(PK_{FORS}', SIG_{HT})",
+        "explanation": "验证者开始递归验证：首先将 \\(PK_{FORS}\\) 作为消息，利用第 0 层的 WOTS+ 签名恢复第 0 层的叶子节点，并结合认证路径计算出第 0 层的树根 \\(Root_0\\)。接着，将算出的 \\(Root_0\\) 作为下一层的消息，继续验证第 1 层的签名... 这一过程不断重复，直到计算出最顶层的根节点 \\(Root'_{top}\\)。",
+        "common": "向上溯源：拿着办事员的工牌号，去查村长的签名，确认村长确实认证过这个工牌，并算出村长的印章样子。拿着算出来的村长印章，去查市长的签名，确认市长确实认证过这个村长...一路向上查，最后算出国王的印章应该长什么样。",
+        "algorithm_detail": "这是一个循环过程，执行 \\(d\\) 次 WOTS+ 恢复和 Merkle 路径计算。",
+        "security_note": "任何一层的验证失败都会导致最终的根节点不匹配。",
+        "dataType": "calculation",
+        "owner": "Bob",
+        "phase": "Verify"
+      },
+      {
+        "id": "step10",
+        "name": "最终比对",
+        "desc": "比较计算出的 \\(Root_{top}'\\) 是否与公钥中的 \\(Root_{top}\\) 相等。如果相等，签名有效。",
+        "formula": "Root_{top}' == PK.Root",
+        "explanation": "最后，将计算出的 \\(Root'_{top}\\) 与公钥中存储的 \\(PK.Root\\) 进行二进制比对。如果两者严格相等，说明整条链条（FORS \\(\\to\\) Layer 0 \\(\\to\\) ... \\(\\to\\) Top）都是数学上有效的，且必然由持有私钥种子的人生成。基于哈希函数的抗碰撞性，伪造这条链是不可能的。",
+        "common": "验明正身：验证者看一眼手里最终算出来的“国王印章”，再拿出一开始大家都知道的“公钥印章”对比。如果一模一样，说明这份文件确实经过了层层审批，是合法的；否则就是伪造的。",
+        "algorithm_detail": "简单的字节比较。",
+        "security_note": "这是信任链的终点。基于 Merkle 树根节点的唯一性。",
+        "dataType": "check",
+        "owner": "Bob",
+        "phase": "Verify"
+      }
+    ]
+  }
+}

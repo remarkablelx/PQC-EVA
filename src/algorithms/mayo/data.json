@@ -1,0 +1,209 @@
+{
+  "concepts": {
+    "oil_space": {
+      "name": "油空间 (Oil Space)",
+      "definition": "O \\subset \\mathbb{F}_q^n, \\dim(O)=o",
+      "explanation": "这是 Mayo 私钥的核心，是一个维数为 \\(o\\) 的秘密子空间。其关键数学性质是：公钥映射 \\(P\\) 作用在该子空间 \\(O\\) 中的任意向量上时，结果都为 \\(0\\)（即在 \\(O\\) 上消失）。"
+    },
+    "whipping_map": {
+      "name": "Whipping 映射 (Whipping Map)",
+      "definition": "\\mathcal{P}^*: \\mathbb{F}_q^{n \\times k} \\to \\mathbb{F}_q^{m \\cdot k}",
+      "explanation": "这是 Mayo 区别于 UOV 的核心技术。它是一种特殊的线性变换，用于将一个小规模的 UOV 映射扩展到一个更大的空间，生成最终的公钥映射 \\(P^*\\)。Mayo 不直接求解 \\(P(s)=t\\)，而是求解扩展后的映射方程。通过这种方式，Mayo 只需要存储少量的修正项和种子就能重建公钥，极大地压缩了公钥大小。"
+    },
+    "linearization": {
+      "name": "线性化 (Linearization)",
+      "definition": "\\mathcal{P}(v+o) = \\mathcal{P}(v) + L(o)",
+      "explanation": "这是解密（签名）时的关键数学步骤。利用极化恒等式和油空间 \\(O\\) 的特性，将原本困难的多变量二次方程（MQ问题）转化为关于未知量（油部分）的线性方程组。"
+    }
+  },
+  "steps": {
+    "keygen": [
+      {
+        "id": "step1",
+        "name": "选择油空间 \\(O\\)",
+        "desc": "随机选择一个维数为 \\(o\\) 的子空间 \\(O\\)。为了计算方便，通常将其表示为一个矩阵或基向量组。",
+        "formula": "O \\in \\mathbb{F}_q^{n \\times o}",
+        "explanation": "在有限域 \\(GF(q)\\)（Mayo 中通常取 \\(q=16\\)）上，系统首先随机选择一个维数为 \\(o\\) 的子空间 \\(O\\)，这被称为“油空间”。在代码实现中，这通常是通过生成一个随机种子 seed_sk，然后由此扩展生成矩阵 \\(O\\) 来实现的。这个空间 \\(O\\) 定义了陷门的几何结构，是后续构建零点映射的基础。<br><br><strong>核心概念解析：</strong><ul class=\"list-disc pl-5 mt-2\"><li><strong>油空间 (Oil Space)</strong>：这是 Mayo 私钥的核心，是一个维数为 \\(o\\) 的秘密子空间。其关键数学性质是：公钥映射 \\(P\\) 作用在该子空间 \\(O\\) 中的任意向量上时，结果都为 \\(0\\)（即在 \\(O\\) 上消失）。</li></ul>",
+        "common": "预设暗门：Alice 想要建造一个复杂的迷宫（数学方程组）。她首先在心中预设了一条“秘密通道”（即油空间 \\(O\\)）。这是一条作弊通道，凡是走进这条通道的数据，在经过特定的数学变换后都会被“归零”或消除。",
+        "algorithm_detail": "油空间 \\(O\\) 通常由其基矩阵表示，维度为 \\(n \\times o\\)。为了安全性和效率，该矩阵通常被选为上三角形式或通过种子生成的随机矩阵。",
+        "security_note": "油空间是私钥的唯一组成部分。如果攻击者恢复了 \\(O\\)，他们就能伪造签名。Mayo 的安全性依赖于“隐蔽子空间问题”的困难性。",
+        "dataType": "secret",
+        "owner": "Alice",
+        "phase": "KeyGen"
+      },
+      {
+        "id": "step2",
+        "name": "构造映射 \\(\\mathcal{P}\\)",
+        "desc": "我们需要构造 \\(m\\) 个二次多项式 \\(p_1, \\dots, p_m\\)，也就是映射 \\(\\mathcal{P}: \\mathbb{F}_q^n \\to \\mathbb{F}_q^m\\)。限制条件：必须保证 \\(\\forall x \\in O, \\mathcal{P}(x) = 0\\)。构造方法：先随机生成 \\(\\mathcal{P}\\)，然后通过修改其系数（线性变换），强制其在 \\(O\\) 上的值为 0。这实际上是求解一个线性方程组来确定多项式系数。",
+        "formula": "\\mathcal{P}(x) = x^T P x",
+        "explanation": "我们需要构造一个多变量二次映射 \\(P(x)=x^T Px\\)，满足一个关键性质：当输入 \\(x\\) 属于油空间 \\(O\\) 时，\\(P(x)=0\\)。为了避免存储巨大的零多项式矩阵，Mayo 采用了“修正法”来压缩公钥。首先，使用公钥种子 seed_pk 伪随机生成两个看起来毫无规律的矩阵 \\(P_1\\) 和 \\(P_2\\)；接着，计算一个修正矩阵 \\(P_3\\)，公式为 \\(P_3 = O^T (P_1 O + P_2)\\)，其目的是强制抵消前两项，使得组合后的整体映射在 \\(O\\) 上消失。",
+        "common": "随机迷宫加补丁：Alice 不想把整个迷宫图纸（巨大的公钥矩阵）都背在身上。她想了一个聪明的办法：她只记下一个“随机数种子”，让 Bob 自己用生成器造出迷宫的大部分结构（\\(P_1, P_2\\)）。但是，随机造出来的迷宫是没有“秘密通道”的。所以 Alice 额外给了 Bob 一小块“补丁”（\\(P_3\\)）。Alice 保证：只要把这个补丁贴上去，原本乱糟糟的随机迷宫里就会神奇地出现那条通向零点的秘密通道。",
+        "algorithm_detail": "构造过程涉及求解使得 \\(P(O)=0\\) 的线性约束。Mayo 巧妙地将公钥分解为伪随机部分（由种子生成）和修正部分，使得公钥结构既满足陷门要求又保持紧凑。",
+        "security_note": "修正矩阵 \\(P_3\\) 泄露了关于 \\(O\\) 的部分信息，但不足以恢复 \\(O\\)，除非参数选择不当。Mayo 的参数经过精心设计以抵抗这种代数攻击。",
+        "dataType": "calculation",
+        "owner": "Alice",
+        "phase": "KeyGen"
+      },
+      {
+        "id": "step3",
+        "name": "压缩公钥",
+        "desc": "由于 \\(\\mathcal{P}\\) 具有特殊的结构（在 \\(O\\) 上为 0），可以通过特定的基变换（类似 UOV 的 \\(T\\) 变换）将其表示为标准形式。Mayo 利用这一点，结合随机种子生成大部分公钥矩阵，只存储少量的修正项，从而极大地压缩了公钥大小。",
+        "formula": "pk = (\\text{seed}, P_{correction})",
+        "explanation": "Mayo 利用 Whipping 映射技术和公钥的特殊结构（在 \\(O\\) 上消逝），结合随机种子生成大部分公钥矩阵，只存储少量的修正项，从而极大地压缩了公钥大小。<br><br><strong>核心概念解析：</strong><ul class=\"list-disc pl-5 mt-2\"><li><strong>Whipping 映射</strong>：这是 Mayo 区别于 UOV 的核心技术。它是一种特殊的线性变换，用于将一个小规模的 UOV 映射扩展到一个更大的空间，生成最终的公钥映射 \\(P^*\\)。</li></ul>",
+        "common": "极简钥匙包：Alice 最终交给 Bob 的公钥只有一个种子和一小块补丁。而她自己留下的私钥更简单，只是另一颗种子。这种极简设计让 Mayo 非常适合存储受限的环境。",
+        "algorithm_detail": "公钥大小是 UOV 的痛点，Mayo 通过这种压缩技术将公钥大小减少了几个数量级，使其在 NIST 竞赛中具有竞争力。",
+        "security_note": "种子必须具有高熵。任何对种子的预测都能导致公钥完全泄露。",
+        "dataType": "uniform",
+        "owner": "Alice",
+        "phase": "KeyGen"
+      },
+      {
+        "id": "step4",
+        "name": "输出",
+        "desc": "公钥 (\\(pk\\))：映射 \\(\\mathcal{P}\\) 的紧凑表示（通常是一个种子 + 少量矩阵）。私钥 (\\(sk\\))：油空间 \\(O\\) 的相关信息（使得持有者能进行线性化求解）。",
+        "formula": "Output (pk, sk)",
+        "explanation": "最终生成的公钥 \\(pk = (\\text{seed\\_pk}, P_3)\\)，私钥 \\(sk = \\text{seed\\_sk}\\)。值得注意的是，私钥极其紧凑，仅需存储一个种子即可在需要时完全恢复出油空间 \\(O\\)。",
+        "common": "Alice 整理好公钥发布出去，自己小心保存那个能生成油空间的私钥种子。",
+        "algorithm_detail": "私钥仅需存储种子，这使得 Mayo 的私钥非常小（仅几十字节）。",
+        "security_note": "私钥的安全性完全依赖于种子，必须防止侧信道攻击泄露种子信息。",
+        "dataType": "secret",
+        "owner": "Alice",
+        "phase": "KeyGen"
+      }
+    ],
+    "sign": [
+      {
+        "id": "step5",
+        "name": "哈希消息",
+        "desc": "将消息 \\(M\\)（和随机盐值）哈希为一个目标向量 \\(T \\in \\mathbb{F}_q^{m \\cdot k}\\)。",
+        "formula": "T = H(M || \\text{salt})",
+        "explanation": "将待签名的消息 \\(M\\) 和一个随机盐值 salt 进行哈希运算，映射为有限域上的目标向量 \\(T \\in F_q^m\\)（文档中也称为挑战值 \\(t\\)）。这一步将任意长度的消息转化为数学问题中的常数项，同时保证了签名的随机性和抗碰撞性。",
+        "common": "确立靶心：把要签署的文件转化成一个具体的数学坐标点（靶心 \\(T\\)）。Alice 的任务就是射出的箭（签名）能精确地落在靶心上。",
+        "algorithm_detail": "目标向量 \\(T\\) 的维度是 \\(m \\cdot k\\)，这是经过 Whipping 扩展后的维度。哈希函数需要输出均匀分布的域元素。",
+        "security_note": "使用随机盐值 (salt) 对于防止多目标攻击至关重要。",
+        "dataType": "hash",
+        "owner": "Alice",
+        "phase": "Sign"
+      },
+      {
+        "id": "step6",
+        "name": "选择 Vinegar 部分",
+        "desc": "随机选择签名矩阵 \\(S\\) 的一部分，记为 \\(S_{vinegar}\\)（通常是随机填充）。",
+        "formula": "S = (S_{vinegar}, ?)",
+        "explanation": "将待求的签名向量 \\(S\\) 视为两部分：Vinegar（醋，已知/随机部分）和 Oil（油，未知部分）。算法首先随机生成一个向量 \\(V\\) 作为 Vinegar 部分。这一步相当于“先猜一部分答案”，通过固定一部分变量，将原本复杂的多变量方程组进行降维处理。",
+        "common": "蒙一部分答案：这个方程太难了，变量实在太多。Alice 决定先“蒙”一部分答案（比如先把 \\(x\\) 和 \\(y\\) 随便设个值），看看在此基础上能不能算出剩下的 \\(z\\)。",
+        "algorithm_detail": "Vinegar 变量的选择提供了随机性，确保每次签名即使对同一消息也是不同的。",
+        "security_note": "Vinegar 部分必须是真随机的，否则可能泄露 Oil 空间的结构。",
+        "dataType": "random",
+        "owner": "Alice",
+        "phase": "Sign"
+      },
+      {
+        "id": "step7",
+        "name": "线性化方程 (The Trapdoor)",
+        "desc": "这是最核心的数学步骤。我们要求解 \\(S\\) 的剩余部分（Oil 部分），记为 \\(S_{oil}\\)。利用极化恒等式：\\(\\mathcal{P}(v + o) = \\mathcal{P}(v) + \\mathcal{P}(o) + \\text{Bilinear}(v, o)\\)。",
+        "formula": "\\mathcal{P}(v) + \\text{Linear}(o) = T",
+        "explanation": "这是多变量密码学的核心魔法。原始方程 \\(P(x)=y\\) 是二次的（Quadratic），直接求解属于 NP-hard 问题。但是，利用极化恒等式：\\(P(v+o) = P(v) + P(o) + L(v,o)\\)，并在私钥的帮助下（已知 \\(o \\in O\\) 时 \\(P(o)=0\\)），二次项消失了。方程瞬间转化为关于 \\(o\\) 的线性方程：\\(L(v,o) = T - P(v)\\)。此时构建的矩阵 \\(L = (P_1 + P_1^T)O + P_2\\) 就是线性系统的系数矩阵。<br><br><strong>核心概念解析：</strong><ul class=\"list-disc pl-5 mt-2\"><li><strong>线性化 (Linearization)</strong>：利用极化恒等式和油空间 \\(O\\) 的特性，将原本困难的多变量二次方程（MQ问题）转化为关于未知量（油部分）的线性方程组。</li></ul>",
+        "common": "曲线变直线：这就是“陷门”的威力。对于没有私钥的普通人，这是一个弯弯曲曲的迷宫（二次曲线），根本找不到出口。但 Alice 站在她的“秘密通道”（油空间）上观察，迷宫的墙壁突然变直了（线性化）。她不需要解复杂的曲线方程，只需要解简单的直线方程。",
+        "algorithm_detail": "这里利用了双线性形式 \\(L(v,o)\\) 对 \\(o\\) 是线性的特性。因为 \\(O\\) 是零化子空间，二次项 \\(P(o)\\) 消失，这是计算变简单的关键。",
+        "security_note": "如果没有私钥信息 \\(O\\)，方程仍然是二次的，求解需要指数级时间。",
+        "dataType": "calculation",
+        "owner": "Alice",
+        "phase": "Sign"
+      },
+      {
+        "id": "step8",
+        "name": "求解线性方程组",
+        "desc": "利用私钥（油空间 \\(O\\) 的基），将 \\(\\mathcal{P}^*(S) = T\\) 转化为关于 \\(S_{oil}\\) 的大型线性方程组。使用高斯消元法求解 \\(S_{oil}\\)。",
+        "formula": "A \\cdot S_{oil} = B",
+        "explanation": "构建好线性系统 \\(A \\cdot x = y\\) 后，使用高斯消元法在 \\(GF(16)\\) 上求解。Mayo 引入了一个扩展因子 \\(k\\)（把单次求解变成求解一个矩阵 \\(S\\) 的多列），这使得变量的数量远多于方程的数量（\\(m\\) 个方程，但有更多变量），因此解存在的概率极高。如果运气不好遇到无解的情况（极低概率），只需更换随机向量 \\(V\\) 重试即可。",
+        "common": "简单计算：Alice 得到了一组简单的线性方程。因为她之前“蒙”的变量（Vinegar）和她拥有的自由度很高，她几乎总是能找到一组解。如果运气不好碰到死胡同，她就换个姿势（重选随机数）再试一次。",
+        "algorithm_detail": "Mayo 的设计使得该线性方程组几乎总是可解的。求解过程可以使用优化的线性代数库。",
+        "security_note": "求解过程涉及秘密数据，应采用恒定时间算法以防止侧信道攻击。",
+        "dataType": "calculation",
+        "owner": "Alice",
+        "phase": "Sign"
+      },
+      {
+        "id": "step9",
+        "name": "组合签名",
+        "desc": "将 \\(S_{vinegar}\\) 和解出的 \\(S_{oil}\\) 组合成最终的签名矩阵 \\(S\\)。",
+        "formula": "S = S_{vinegar} + S_{oil}",
+        "explanation": "解出的 \\(x\\) 即为 Oil 空间的系数。最终的签名 \\(s\\) 是 Vinegar 部分 \\(V\\) 和 Oil 部分 \\(x\\) 的线性组合（公式：\\(s = (V_i O + x_i) || x_i\\)）。最终输出的签名数据包包含了盐值 salt 和组合后的向量 \\(s\\)。",
+        "common": "包装答案：Alice 拿着在工作室算出的答案，再用“搅拌机”逆向处理一下，把它包装成符合外面那个乱麻迷宫（公钥）格式的最终答案 \\(s\\)，然后交给 Bob。",
+        "algorithm_detail": "签名矩阵 \\(S\\) 被序列化为字节串输出。",
+        "security_note": "签名的随机性和有效性至此确立。",
+        "dataType": "calculation",
+        "owner": "Alice",
+        "phase": "Sign"
+      },
+      {
+        "id": "step10",
+        "name": "输出",
+        "desc": "签名 \\(\\sigma = S\\)（展开为一维向量）。",
+        "formula": "\\sigma",
+        "explanation": "输出最终的签名。",
+        "common": "Alice 发送签名给 Bob。",
+        "algorithm_detail": "签名通常包括盐值和序列化后的矩阵 \\(S\\)。",
+        "security_note": "签名大小取决于参数选择，Mayo 的签名通常比 Dilithium 稍大，但比纯 UOV 小。",
+        "dataType": "signature",
+        "owner": "Alice",
+        "phase": "Sign"
+      }
+    ],
+    "verify": [
+      {
+        "id": "step11",
+        "name": "解析签名",
+        "desc": "将签名 \\(\\sigma\\) 解析为矩阵 \\(S \\in \\mathbb{F}_q^{n \\times k}\\)。",
+        "formula": "S \\leftarrow \\sigma",
+        "explanation": "Bob 从收到的签名中提取盐值 salt 和向量 \\(s\\)。",
+        "common": "Bob 拿到签名数据包。",
+        "algorithm_detail": "解析过程是序列化的逆过程。",
+        "security_note": "格式检查是防止格式化字符串攻击等漏洞的第一步。",
+        "dataType": "check",
+        "owner": "Bob",
+        "phase": "Verify"
+      },
+      {
+        "id": "step12",
+        "name": "哈希消息",
+        "desc": "使用同样的哈希函数，将消息 \\(M\\) 转换为目标向量 \\(T\\)。",
+        "formula": "T = H(M || \\text{salt})",
+        "explanation": "使用与 Alice 相同的哈希函数计算目标值 \\(t = H(M || \\text{salt})\\)，这一步是为了复现数学方程右边的常数项。",
+        "common": "确认靶心：Bob 拿到签名，先读出里面的随机数，根据公认的规则算出 Alice 应该射击的靶心位置在哪里。",
+        "algorithm_detail": "必须使用完全相同的哈希参数。",
+        "security_note": "如果哈希值不匹配，说明消息被篡改。",
+        "dataType": "hash",
+        "owner": "Bob",
+        "phase": "Verify"
+      },
+      {
+        "id": "step13",
+        "name": "计算映射",
+        "desc": "使用公钥中的映射 \\(\\mathcal{P}\\)，计算扩展映射的值 \\(T' = \\mathcal{P}^*(S)\\)。这一步本质上是将 \\(S\\) 的每一列代入二次多项式，然后按 Whipping 规则组合结果。",
+        "formula": "T' = \\mathcal{P}^*(S)",
+        "explanation": "Bob 首先使用公钥中的 seed_pk 恢复 \\(P_1, P_2\\)，并结合公钥中存储的 \\(P_3\\) 重构完整的映射矩阵 \\(P\\)。然后，他计算 \\(P^*(S)\\)（通常涉及矩阵运算 \\(S P S^T\\)）。这一步本质上就是将签名 \\(S\\) 代入公钥定义的多变量二次多项式中进行求值。",
+        "common": "代入验算：验证就像验算数学题。解题（签名）很难，需要私钥把曲线变直线。但验算（验证）很简单，Bob 只需要把 Alice 给的答案 \\(S\\) 代入公钥给出的方程公式里，算一下结果是多少。",
+        "algorithm_detail": "验证计算仅涉及公钥运算，非常快速。Whipping 映射的结构允许高效的批量计算。",
+        "security_note": "验证者不需要知道任何关于油空间的秘密信息，只需要公钥。",
+        "dataType": "calculation",
+        "owner": "Bob",
+        "phase": "Verify"
+      },
+      {
+        "id": "step14",
+        "name": "比对",
+        "desc": "检查 \\(T' \\stackrel{?}{=} T\\)。如果相等，签名有效。",
+        "formula": "T' == T",
+        "explanation": "最后，Bob 检查计算出的 \\(P^*(S)\\) 是否与哈希生成的目标值 \\(t\\) 相等。如果相等，验证通过。",
+        "common": "通过检查：Bob 看看算出来的结果是不是等于靶心。如果是，说明 Alice 确实拥有私钥，因为只有拥有私钥的人才能在不知道捷径的情况下，构造出能通过这个复杂方程组的解。",
+        "algorithm_detail": "严格的相等性检查。",
+        "security_note": "MQ 问题的单向性保证了伪造签名的困难性。",
+        "dataType": "check",
+        "owner": "Bob",
+        "phase": "Verify"
+      }
+    ]
+  }
+}

@@ -1,48 +1,57 @@
-# PQC2.0
+# PQC-EVA
 
-This template should help get you started developing with Vue 3 in Vite.
+**Post-Quantum Cryptography Exploratory Visualization Analysis**
 
-## Recommended IDE Setup
+交互式后量子计算密码可视分析系统。纯前端 SPA，无需后端服务。
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## 覆盖算法
 
-## Recommended Browser Setup
+| 类别 | 算法 |
+|---|---|
+| 格密码 | Kyber (ML-KEM), Dilithium (ML-DSA), Falcon, NTRU |
+| 多变量密码 | UOV, Mayo |
+| 编码密码 | HQC |
+| 安全哈希 | XMSS, SPHINCS+ |
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd) 
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+## 功能模块
 
-## Type Support for `.vue` Imports in TS
+- **Matrix 可视化** — 基于 D3.js 的算法步骤矩阵动画展示
+- **算法对比** — ECharts 雷达图多算法/多维度对比
+- **交互式演示** — 逐步演示算法各阶段的密钥/密文数据流
+- **真实数据** — 各算法实际运行参数与性能数据
+- **推荐向导** — 根据安全需求自动推荐算法
+- **知识测验** — 内置算法知识问答
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+## 技术栈
 
-## Customize configuration
+Vue 3, TypeScript, Vite, Pinia, Vue Router, D3.js, ECharts, GSAP, Tailwind CSS, KaTeX
 
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
+## 快速开始
 
 ```sh
 npm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+构建生产版本：
 
 ```sh
 npm run build
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+预览构建结果：
+
+```sh
+npm run preview
+```
+
+## 格式检查与测试
 
 ```sh
 npm run lint
+npm run test
 ```
+
+## 许可证
+
+MIT

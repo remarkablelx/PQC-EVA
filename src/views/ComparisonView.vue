@@ -315,7 +315,7 @@ const loadRealData = async () => {
     if (!algo) continue
 
     try {
-      const response = await fetch(`/data/ui_${algo.name}_output.json`)
+      const response = await fetch(`${import.meta.env.BASE_URL}data/ui_${algo.name}_output.json`)
       const data = await response.json()
 
       algo.versions = calculateStats(data, maxValues)

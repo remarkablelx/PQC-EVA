@@ -8,6 +8,7 @@ import autoprefixer from 'autoprefixer'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/PQC-EVA/',
   plugins: [
     vue(),
     vueDevTools(),

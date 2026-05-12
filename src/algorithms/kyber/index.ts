@@ -3,8 +3,6 @@ import { generateData } from '../utils'
 import KyberMatrix from './KyberMatrix.vue'
 import KyberFormula from '../../components/Formula.vue'
 import kyberData from './data.json'
-import realDump from '../../../public/data/ui_kyber_output.json'
-
 const normalizeSteps = (steps: any[]): AlgoStep[] => {
   return steps.map((step) => ({
     ...step,
@@ -38,9 +36,17 @@ const extractData = (source: any, prefix: string, rows: number, cols?: number) =
   return res.length > 0 ? res : null
 }
 
-const raw = realDump[0] || { keypair: {}, encapsulation: {}, decapsulation: {} }
-const kp = raw.keypair
-const encaps = raw.encapsulation
+let cachedKyberData: { kp: any; encaps: any } | null = null
+
+async function getKyberData() {
+  if (!cachedKyberData) {
+    const url = `${import.meta.env.BASE_URL}data/ui_kyber_output.json`
+    const realDump = await fetch(url).then(r => r.json())
+    const raw = realDump[0] || { keypair: {}, encapsulation: {}, decapsulation: {} }
+    cachedKyberData = { kp: raw.keypair, encaps: raw.encapsulation }
+  }
+  return cachedKyberData
+}
 
 export const kyberModule: AlgorithmModule = {
   id: 'kyber',
@@ -55,7 +61,8 @@ export const kyberModule: AlgorithmModule = {
     ...normalizeSteps(kyberData.steps.decaps)
   ],
   getConcepts: () => conceptsArray,
-  initActors(seed: number): Actor {
+  async initActors(seed: number): Promise<Actor> {
+    const { kp, encaps } = await getKyberData()
     const aliceData = {
       A: norm(extractData(kp, 'A', 2, 2) || [
         1597, 1612, -202, -487, 449, 21, -482, -1455, 1142, 1054, 1011, -1146, -684, 735, 695, 897,

@@ -54,7 +54,7 @@ export const useAlgoStore = defineStore('algo', () => {
       MatrixComponent.value = module.matrixComponent
       FormulaComponent.value = module.formulaComponent || GenericFormula
       steps.value = module.getSteps()
-      actors.value = module.initActors(Date.now())
+      actors.value = await module.initActors(Date.now())
       currentStepIndex.value = 0
     } catch (e: any) {
       console.error('Failed to load algorithm:', e)

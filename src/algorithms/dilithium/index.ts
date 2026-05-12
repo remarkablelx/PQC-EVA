@@ -3,8 +3,6 @@ import { generateData } from '../utils'
 import DilithiumMatrix from './DilithiumMatrix.vue'
 import DilithiumFormula from '../../components/Formula.vue'
 import dilithiumData from './data.json'
-import realDump from '../../../public/data/ui_dilithium_output.json'
-
 const normalizeSteps = (steps: any[]): AlgoStep[] => {
   return steps.map((step) => ({
     ...step,
@@ -36,10 +34,17 @@ const extractData = (source: any, prefix: string, rows: number, cols?: number) =
   return res.length > 0 ? res : null
 }
 
-const raw = realDump[0] || { keypair: {}, sign: {}, open: {} }
-const kp = raw.keypair
-const sg = raw.sign
-const op = raw.open
+let cachedDilithiumData: { kp: any; sg: any; op: any } | null = null
+
+async function getDilithiumData() {
+  if (!cachedDilithiumData) {
+    const url = `${import.meta.env.BASE_URL}data/ui_dilithium_output.json`
+    const realDump = await fetch(url).then(r => r.json())
+    const raw = realDump[0] || { keypair: {}, sign: {}, open: {} }
+    cachedDilithiumData = { kp: raw.keypair, sg: raw.sign, op: raw.open }
+  }
+  return cachedDilithiumData
+}
 
 const K = 4
 const L = 4
@@ -57,7 +62,8 @@ export const dilithiumModule: AlgorithmModule = {
     ...normalizeSteps(dilithiumData.steps.verify),
   ],
   getConcepts: () => conceptsArray,
-  initActors(seed: number): Actor {
+  async initActors(seed: number): Promise<Actor> {
+    const { kp, sg, op } = await getDilithiumData()
     const aliceData = {
       rho: generateData(1, 1, 'uniform', seed),
       A: extractData(kp, 'A', K, L),

@@ -3,8 +3,6 @@ import { generateData } from '../utils'
 import XmssMatrix from './XmssMatrix.vue'
 import XmssFormula from '../../components/Formula.vue'
 import xmssData from './data.json'
-import realDump from '../../../public/data/ui_xmss_output.json'
-
 const normalizeSteps = (steps: any[]): AlgoStep[] => {
   return steps.map((step) => ({
     ...step,
@@ -36,10 +34,17 @@ const extractData = (source: any, prefix: string, rows: number, cols?: number) =
   return res.length > 0 ? res : null
 }
 
-const raw = realDump[0] || { keypair: {}, sign: {}, open: {} }
-const kp = raw.keypair
-const sg = raw.sign
-const op = raw.open
+let cachedXmssData: { kp: any; sg: any; op: any } | null = null
+
+async function getXmssData() {
+  if (!cachedXmssData) {
+    const url = `${import.meta.env.BASE_URL}data/ui_xmss_output.json`
+    const realDump = await fetch(url).then(r => r.json())
+    const raw = realDump[0] || { keypair: {}, sign: {}, open: {} }
+    cachedXmssData = { kp: raw.keypair, sg: raw.sign, op: raw.open }
+  }
+  return cachedXmssData
+}
 
 export const xmssModule: AlgorithmModule = {
   id: 'xmss',
@@ -54,7 +59,8 @@ export const xmssModule: AlgorithmModule = {
     ...normalizeSteps(xmssData.steps.verify),
   ],
   getConcepts: () => conceptsArray,
-  initActors(seed: number): Actor {
+  async initActors(seed: number): Promise<Actor> {
+    const { kp, sg, op } = await getXmssData()
     const aliceData = {
       pk_size: (kp as any).pk_size || 0,
       sk_size: (kp as any).sk_size || 0,

@@ -3,8 +3,6 @@ import { generateData } from '../utils'
 import SphincsMatrix from './SphincsMatrix.vue'
 import SphincsFormula from '../../components/Formula.vue'
 import sphincsData from './data.json'
-import realDump from '../../../public/data/ui_sphincs_output.json'
-
 const normalizeSteps = (steps: any[]): AlgoStep[] => {
   return steps.map((step) => ({
     ...step,
@@ -36,10 +34,17 @@ const extractData = (source: any, prefix: string, rows: number, cols?: number) =
   return res.length > 0 ? res : null
 }
 
-const raw = realDump[0] || { keypair: {}, sign: {}, open: {} }
-const kp = raw.keypair
-const sg = raw.sign
-const op = raw.open
+let cachedSphincsData: { kp: any; sg: any; op: any } | null = null
+
+async function getSphincsData() {
+  if (!cachedSphincsData) {
+    const url = `${import.meta.env.BASE_URL}data/ui_sphincs_output.json`
+    const realDump = await fetch(url).then(r => r.json())
+    const raw = realDump[0] || { keypair: {}, sign: {}, open: {} }
+    cachedSphincsData = { kp: raw.keypair, sg: raw.sign, op: raw.open }
+  }
+  return cachedSphincsData
+}
 
 export const sphincsModule: AlgorithmModule = {
   id: 'sphincs',
@@ -54,7 +59,8 @@ export const sphincsModule: AlgorithmModule = {
     ...normalizeSteps(sphincsData.steps.verify),
   ],
   getConcepts: () => conceptsArray,
-  initActors(seed: number): Actor {
+  async initActors(seed: number): Promise<Actor> {
+    const { kp, sg, op } = await getSphincsData()
     const aliceData = {
       n: (kp as any).n || 16,
       h: (kp as any).h || 66,

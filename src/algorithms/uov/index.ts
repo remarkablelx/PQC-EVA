@@ -3,8 +3,6 @@ import { generateData } from '../utils'
 import UovMatrix from './UovMatrix.vue'
 import UovFormula from '../../components/Formula.vue'
 import uovData from './data.json'
-import realDump from '../../../public/data/ui_uov_output.json'
-
 const normalizeSteps = (steps: any[]): AlgoStep[] => {
   return steps.map((step) => ({
     ...step,
@@ -36,10 +34,17 @@ const extractData = (source: any, prefix: string, rows: number, cols?: number) =
   return res.length > 0 ? res : null
 }
 
-const raw = realDump[0] || { keypair: {}, sign: {}, open: {} }
-const kp = raw.keypair
-const sg = raw.sign
-const op = raw.open
+let cachedUovData: { kp: any; sg: any; op: any } | null = null
+
+async function getUovData() {
+  if (!cachedUovData) {
+    const url = `${import.meta.env.BASE_URL}data/ui_uov_output.json`
+    const realDump = await fetch(url).then(r => r.json())
+    const raw = realDump[0] || { keypair: {}, sign: {}, open: {} }
+    cachedUovData = { kp: raw.keypair, sg: raw.sign, op: raw.open }
+  }
+  return cachedUovData
+}
 
 export const uovModule: AlgorithmModule = {
   id: 'uov',
@@ -54,7 +59,8 @@ export const uovModule: AlgorithmModule = {
     ...normalizeSteps(uovData.steps.verify),
   ],
   getConcepts: () => conceptsArray,
-  initActors(seed: number): Actor {
+  async initActors(seed: number): Promise<Actor> {
+    const { kp, sg, op } = await getUovData()
     const aliceData = {
       pk_size: (kp as any).pk_size || 0,
       sk_size: (kp as any).sk_size || 0,

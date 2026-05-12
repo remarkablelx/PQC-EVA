@@ -3,8 +3,6 @@ import { generateData } from '../utils'
 import MayoMatrix from './MayoMatrix.vue'
 import MayoFormula from '../../components/Formula.vue'
 import mayoData from './data.json'
-import realDump from '../../../public/data/ui_mayo_output.json'
-
 const normalizeSteps = (steps: any[]): AlgoStep[] => {
   return steps.map((step) => ({
     ...step,
@@ -36,10 +34,17 @@ const extractData = (source: any, prefix: string, rows: number, cols?: number) =
   return res.length > 0 ? res : null
 }
 
-const raw = realDump[0] || { keypair: {}, sign: {}, open: {} }
-const kp = raw.keypair
-const sg = raw.sign
-const op = raw.open
+let cachedMayoData: { kp: any; sg: any; op: any } | null = null
+
+async function getMayoData() {
+  if (!cachedMayoData) {
+    const url = `${import.meta.env.BASE_URL}data/ui_mayo_output.json`
+    const realDump = await fetch(url).then(r => r.json())
+    const raw = realDump[0] || { keypair: {}, sign: {}, open: {} }
+    cachedMayoData = { kp: raw.keypair, sg: raw.sign, op: raw.open }
+  }
+  return cachedMayoData
+}
 
 export const mayoModule: AlgorithmModule = {
   id: 'mayo',
@@ -54,7 +59,8 @@ export const mayoModule: AlgorithmModule = {
     ...normalizeSteps(mayoData.steps.verify),
   ],
   getConcepts: () => conceptsArray,
-  initActors(seed: number): Actor {
+  async initActors(seed: number): Promise<Actor> {
+    const { kp, sg, op } = await getMayoData()
     const aliceData = {
       O: extractData(kp, 'O', 84, 18) || generateData(84, 18, 'uniform', seed),
       P1: (kp as any).keypair_P1 || '',

@@ -3,8 +3,6 @@ import { generateData } from '../utils'
 import HQCMatrix from './HQCMatrix.vue'
 import HQCFormula from '../../components/Formula.vue'
 import hqcData from './data.json'
-import realDump from '../../../public/data/ui_hqc_output.json'
-
 const normalizeSteps = (steps: any[]): AlgoStep[] => {
   return steps.map((step) => ({
     ...step,
@@ -37,10 +35,17 @@ const extractData = (source: any, prefix: string, rows: number, cols?: number) =
   return res.length > 0 ? res : null
 }
 
-const raw = realDump[0] || { keypair: {}, encapsulation: {}, decapsulation: {} }
-const kp = raw.keypair
-const enc = raw.encapsulation
-const dec = raw.decapsulation
+let cachedHqcData: { kp: any; enc: any; dec: any } | null = null
+
+async function getHqcData() {
+  if (!cachedHqcData) {
+    const url = `${import.meta.env.BASE_URL}data/ui_hqc_output.json`
+    const realDump = await fetch(url).then(r => r.json())
+    const raw = realDump[0] || { keypair: {}, encapsulation: {}, decapsulation: {} }
+    cachedHqcData = { kp: raw.keypair, enc: raw.encapsulation, dec: raw.decapsulation }
+  }
+  return cachedHqcData
+}
 
 const PARAM_N1 = 46
 const PARAM_N2 = 384
@@ -58,7 +63,8 @@ export const hqcModule: AlgorithmModule = {
     ...normalizeSteps(hqcData.steps.decaps),
   ],
   getConcepts: () => conceptsArray,
-  initActors(seed: number): Actor {
+  async initActors(seed: number): Promise<Actor> {
+    const { kp } = await getHqcData()
     const aliceData = {
       seed: generateData(1, 1, 'uniform', seed),
       x: generateData(PARAM_N1, 1, 'noise', seed),

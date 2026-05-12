@@ -226,7 +226,7 @@ export interface AlgorithmModule {
   quizFile: string
   getSteps(): AlgoStep[]
   getConcepts?(): { name: string; description: string }[]
-  initActors(seed: number): Actor
+  initActors(seed: number): Actor | Promise<Actor>
   matrixComponent: Component
   formulaComponent: Component
   treeComponent?: Component

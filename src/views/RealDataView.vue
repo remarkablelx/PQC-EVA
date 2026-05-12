@@ -1024,7 +1024,7 @@ const loadData = async () => {
 
     // 1. Load key types data
     try {
-      const keyTypesResponse = await fetch(`/data/key_types.json`);
+      const keyTypesResponse = await fetch(`${import.meta.env.BASE_URL}data/key_types.json`);
       console.log('Key types response status:', keyTypesResponse.status);
       if (keyTypesResponse.ok) {
         const keyTypesData = await keyTypesResponse.json();
@@ -1046,7 +1046,7 @@ const loadData = async () => {
     console.log('Loading data for:', algoName);
     console.log('Loading file:', fileName);
 
-    const response = await fetch(`/data/${fileName}`);
+    const response = await fetch(`${import.meta.env.BASE_URL}data/${fileName}`);
     console.log('Response status:', response.status);
     if (!response.ok) {
       throw new Error(`Failed to load data: ${response.statusText}`);

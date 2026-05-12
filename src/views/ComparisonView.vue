@@ -214,7 +214,7 @@ const loadRealData = async () => {
 
   for (const algoName of algoNames) {
     try {
-      const response = await fetch(`/data/ui_${algoName}_output.json`)
+      const response = await fetch(`${import.meta.env.BASE_URL}data/ui_${algoName}_output.json`)
       const data = await response.json()
 
       allRawData.push(...data)

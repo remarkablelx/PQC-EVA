@@ -180,7 +180,7 @@ export const useAlgoStore = defineStore('algo', () => {
       const loader = AlgorithmRegistry[currentAlgoId.value]
       if (!loader) throw new Error(`Algorithm ${currentAlgoId.value} not found`)
       const module = await loader()
-      const response = await fetch(`/data/${module.quizFile}`)
+      const response = await fetch(`${import.meta.env.BASE_URL}data/${module.quizFile}`)
       if (!response.ok) throw new Error(`Failed to load quiz file: ${module.quizFile}`)
       const text = await response.text()
       quizQuestions.value = parseQuizText(text)
